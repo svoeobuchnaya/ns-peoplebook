@@ -33,7 +33,8 @@ export default function ProfileEditPage() {
   const [savedMessage, setSavedMessage] = useState(false)
 
   const { register, handleSubmit, control, reset, watch, formState: { errors } } = useForm<ProfileUpdateData>({
-    resolver: zodResolver(profileUpdateSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(profileUpdateSchema) as any,
   })
 
   useEffect(() => {

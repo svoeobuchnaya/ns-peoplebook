@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
@@ -144,10 +144,13 @@ export default function OnboardingPage() {
     watch,
     setValue,
     getValues,
+    setError,
+    clearErrors,
     trigger,
     formState: { errors },
   } = useForm<ProfileFormData>({
-    resolver: zodResolver(profileSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(profileSchema) as any,
     defaultValues: {
       display_name: '',
       photo_url: '',
@@ -180,6 +183,30 @@ export default function OnboardingPage() {
 
   const watchedLookingForRomantic = watch('looking_for_romantic')
 
+  // Force-register array-backed fields in RHF internal state so resolver never sees undefined.
+  useEffect(() => {
+    const currentProfessional = getValues('professional_interests')
+    const normalizedProfessional = Array.isArray(currentProfessional) ? currentProfessional : []
+    setValue('professional_interests', normalizedProfessional, {
+      shouldValidate: false,
+      shouldDirty: false,
+      shouldTouch: false,
+    })
+
+    const currentPersonal = getValues('personal_interests')
+    const normalizedPersonal = Array.isArray(currentPersonal) ? currentPersonal : []
+    setValue('personal_interests', normalizedPersonal, {
+      shouldValidate: false,
+      shouldDirty: false,
+      shouldTouch: false,
+    })
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[DEBUG][Onboarding Init] professional_interests:', normalizedProfessional)
+      console.log('[DEBUG][Onboarding Init] personal_interests:', normalizedPersonal)
+    }
+  }, [getValues, setValue])
+
   // ─── Visibility helper ───────────────────────────────────
   const setVis = (section: string, val: boolean) => {
     setVisibility((prev) => ({ ...prev, [section]: val }))
@@ -204,19 +231,53 @@ export default function OnboardingPage() {
   }
 
   const goNext = async () => {
+    // Steps 3 and 4 use InterestChips (Controller-based). The zodResolver
+    // reads RHF's internal _formValues, which only gets the array written in
+    // after field.onChange fires — i.e. after the first chip click. If the user
+    // clicks Next without touching any chip, _formValues has no entry for the
+    // field and the resolver sees undefined, producing the confusing
+    // "expected array, received undefined" error instead of "select at least one".
+    //
+    // Fix: skip trigger() for these steps and validate via getValues() directly.
+    // getValues() merges _defaultValues + _formValues so it always returns at
+    // least [], while chip selections are reflected immediately.
+    if (currentStep === 3) {
+      const selected = getValues('professional_interests')
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[DEBUG][Step 3 Next] professional_interests before validation:', selected)
+      }
+      if (!selected || selected.length === 0) {
+        setError('professional_interests', {
+          type: 'manual',
+          message: 'Select at least one professional interest',
+        })
+        return
+      }
+      clearErrors('professional_interests')
+      setCurrentStep((s) => s + 1)
+      setSubmitError(null)
+      return
+    }
+
+    if (currentStep === 4) {
+      const selected = getValues('personal_interests')
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[DEBUG][Step 4 Next] personal_interests before validation:', selected)
+      }
+      if (!selected || selected.length === 0) {
+        setError('personal_interests', {
+          type: 'manual',
+          message: 'Select at least one personal interest',
+        })
+        return
+      }
+      clearErrors('personal_interests')
+      setCurrentStep((s) => s + 1)
+      setSubmitError(null)
+      return
+    }
+
     const fields = stepFields[currentStep]
-
-    // RHF only writes defaultValues to _defaultValues, not _formValues, until
-    // field.onChange is called. The zodResolver reads _formValues directly and
-    // sees undefined for untouched array fields. Force-writing ensures the
-    // resolver always receives a valid array (not undefined).
-    if (fields?.includes('professional_interests')) {
-      setValue('professional_interests', getValues('professional_interests') ?? [])
-    }
-    if (fields?.includes('personal_interests')) {
-      setValue('personal_interests', getValues('personal_interests') ?? [])
-    }
-
     if (fields && fields.length > 0) {
       const valid = await trigger(fields)
       if (!valid) return
@@ -675,10 +736,29 @@ export default function OnboardingPage() {
             <Controller
               name="professional_interests"
               control={control}
+              defaultValue={[]}
               render={({ field }) => (
                 <InterestChips
-                  value={field.value ?? []}
-                  onChange={field.onChange}
+                  value={Array.isArray(field.value) ? field.value : []}
+                  onChange={(v) => {
+                    const nextValue = Array.isArray(v) ? v : []
+                    if (process.env.NODE_ENV !== 'production') {
+                      console.log('[DEBUG][Step 3 Toggle] New interests array:', nextValue)
+                      console.log('[DEBUG][Step 3 Toggle] Current form value BEFORE update:', getValues('professional_interests'))
+                    }
+                    field.onChange(nextValue)
+                    setValue('professional_interests', nextValue, {
+                      shouldValidate: false,
+                      shouldDirty: true,
+                      shouldTouch: true,
+                    })
+                    clearErrors('professional_interests')
+                    if (process.env.NODE_ENV !== 'production') {
+                      setTimeout(() => {
+                        console.log('[DEBUG][Step 3 Toggle] Form value AFTER update:', getValues('professional_interests'))
+                      }, 0)
+                    }
+                  }}
                   options={[...PROFESSIONAL_INTERESTS]}
                   label="Professional Interest"
                 />
@@ -711,10 +791,29 @@ export default function OnboardingPage() {
             <Controller
               name="personal_interests"
               control={control}
+              defaultValue={[]}
               render={({ field }) => (
                 <InterestChips
-                  value={field.value ?? []}
-                  onChange={field.onChange}
+                  value={Array.isArray(field.value) ? field.value : []}
+                  onChange={(v) => {
+                    const nextValue = Array.isArray(v) ? v : []
+                    if (process.env.NODE_ENV !== 'production') {
+                      console.log('[DEBUG][Step 4 Toggle] New interests array:', nextValue)
+                      console.log('[DEBUG][Step 4 Toggle] Current form value BEFORE update:', getValues('personal_interests'))
+                    }
+                    field.onChange(nextValue)
+                    setValue('personal_interests', nextValue, {
+                      shouldValidate: false,
+                      shouldDirty: true,
+                      shouldTouch: true,
+                    })
+                    clearErrors('personal_interests')
+                    if (process.env.NODE_ENV !== 'production') {
+                      setTimeout(() => {
+                        console.log('[DEBUG][Step 4 Toggle] Form value AFTER update:', getValues('personal_interests'))
+                      }, 0)
+                    }
+                  }}
                   options={[...PERSONAL_INTERESTS]}
                   label="Personal Interest"
                 />
