@@ -17,8 +17,10 @@ import {
   SPECIAL_RESIDENCE_OPTIONS
 } from '@/lib/constants'
 import { DEFAULT_VISIBILITY } from '@/types'
-import { Loader2, Save, ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Save, ArrowLeft, Plus, Trash2, Camera } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
+import { cn, getInitials } from '@/lib/utils'
 
 type FormSection = 'identity' | 'interests' | 'looking_for' | 'contacts' | 'additional'
 
@@ -32,8 +34,11 @@ export default function ProfileEditPage() {
   const [additionalInfo, setAdditionalInfo] = useState<{ label: string; value: string }[]>([])
   const [savedMessage, setSavedMessage] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
 
-  const { register, handleSubmit, control, reset, watch, formState: { errors } } = useForm<ProfileUpdateData>({
+  const { register, handleSubmit, control, reset, watch, setValue, formState: { errors } } = useForm<ProfileUpdateData>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(profileUpdateSchema) as any,
   })
@@ -54,6 +59,7 @@ export default function ProfileEditPage() {
 
       setProfileId(profile.id)
       setAdditionalInfo(profile.additional_info || [])
+      setPhotoUrl(profile.photo_url || null)
 
       reset({
         display_name: profile.display_name || '',
@@ -95,6 +101,63 @@ export default function ProfileEditPage() {
     }
     loadProfile()
   }, [reset, router])
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      setPhotoError('Please upload an image file')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoError('Image must be less than 5 MB')
+      return
+    }
+
+    setUploadingPhoto(true)
+    setPhotoError(null)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const filePath = `${user.id}/avatar.${ext}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('profile-photos')
+        .upload(filePath, file, { upsert: true, cacheControl: '3600' })
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('profile-photos')
+        .getPublicUrl(filePath)
+
+      // Save photo_url to the profile immediately via the PATCH API
+      if (profileId) {
+        const res = await fetch(`/api/profiles/${profileId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile: { photo_url: publicUrl } }),
+        })
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}))
+          throw new Error(json.error || 'Failed to save photo')
+        }
+      }
+
+      setPhotoUrl(publicUrl)
+      setValue('photo_url', publicUrl)
+    } catch (err: unknown) {
+      setPhotoError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploadingPhoto(false)
+      // Reset input so the same file can be re-selected if needed
+      e.target.value = ''
+    }
+  }
 
   const onSubmit = async (data: ProfileUpdateData) => {
     if (!profileId) return
@@ -185,6 +248,62 @@ export default function ProfileEditPage() {
           <div className="space-y-5">
             <div className="ns-card p-4 space-y-4">
               <h2 className="text-xs font-semibold text-[#888888] uppercase tracking-wider">Personal Details</h2>
+
+              {/* Photo */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-black">Profile Photo</label>
+                  <VisibilityToggle
+                    section="photo"
+                    value={visibility.photo ?? false}
+                    onChange={(v) => setVisibility((prev) => ({ ...prev, photo: v }))}
+                  />
+                </div>
+                <div className="flex items-center gap-4">
+                  {photoUrl ? (
+                    <div className="w-16 h-16 rounded-full overflow-hidden border border-[#E0E0E0] flex-shrink-0">
+                      <Image
+                        src={photoUrl}
+                        alt="Profile photo"
+                        width={64}
+                        height={64}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-[#F5F5F5] border border-[#E0E0E0] flex items-center justify-center flex-shrink-0">
+                      <span className="text-lg font-semibold text-[#888888]">
+                        {getInitials(watch('display_name') || '')}
+                      </span>
+                    </div>
+                  )}
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="photo-upload"
+                      className={cn(
+                        'flex items-center gap-2 text-sm font-medium cursor-pointer px-3 py-1.5 border border-[#E0E0E0] rounded hover:bg-[#F5F5F5] transition-colors w-fit',
+                        uploadingPhoto && 'opacity-50 cursor-not-allowed'
+                      )}
+                    >
+                      {uploadingPhoto ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
+                      ) : (
+                        <><Camera className="w-4 h-4" /> {photoUrl ? 'Change photo' : 'Upload photo'}</>
+                      )}
+                    </label>
+                    <input
+                      id="photo-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingPhoto}
+                      onChange={handlePhotoUpload}
+                    />
+                    <p className="text-xs text-[#888888]">JPG, PNG or WebP · Max 5 MB</p>
+                    {photoError && <p className="text-xs text-[#E8001D]">{photoError}</p>}
+                  </div>
+                </div>
+              </div>
 
               {/* Display name */}
               <div className="space-y-1.5">
