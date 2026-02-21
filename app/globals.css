@@ -1,26 +1,96 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --radius: 0.25rem;
+  /* NS Design System - Black/White/Gray */
+  --background: oklch(1 0 0);           /* #FFFFFF */
+  --foreground: oklch(0 0 0);           /* #000000 */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0 0 0);
+  --primary: oklch(0 0 0);              /* #000000 */
+  --primary-foreground: oklch(1 0 0);   /* #FFFFFF */
+  --secondary: oklch(0.961 0 0);        /* #F5F5F5 */
+  --secondary-foreground: oklch(0 0 0);
+  --muted: oklch(0.961 0 0);            /* #F5F5F5 */
+  --muted-foreground: oklch(0.533 0 0); /* #888888 */
+  --accent: oklch(0.961 0 0);
+  --accent-foreground: oklch(0 0 0);
+  --destructive: oklch(0.463 0.24 25.7); /* #E8001D */
+  --border: oklch(0.878 0 0);           /* #E0E0E0 */
+  --input: oklch(0.878 0 0);
+  --ring: oklch(0 0 0);
+  --ns-red: #E8001D;
+  --ns-gray: #888888;
+  --ns-light-gray: #F5F5F5;
+  --ns-border: #E0E0E0;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* NS custom utilities */
+@layer utilities {
+  .ns-card {
+    border: 1px solid #E0E0E0;
+    border-radius: 4px;
+  }
+  .ns-badge-resident {
+    background: #000000;
+    color: #FFFFFF;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 10px;
+    letter-spacing: 0.02em;
+  }
+  .ns-badge-red {
+    background: #E8001D;
+    color: #FFFFFF;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 10px;
+  }
+  .font-mono-ns {
+    font-family: var(--font-jetbrains-mono), monospace;
+  }
 }
