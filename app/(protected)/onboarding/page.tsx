@@ -143,6 +143,7 @@ export default function OnboardingPage() {
     control,
     watch,
     setValue,
+    getValues,
     trigger,
     formState: { errors },
   } = useForm<ProfileFormData>({
@@ -204,6 +205,18 @@ export default function OnboardingPage() {
 
   const goNext = async () => {
     const fields = stepFields[currentStep]
+
+    // RHF only writes defaultValues to _defaultValues, not _formValues, until
+    // field.onChange is called. The zodResolver reads _formValues directly and
+    // sees undefined for untouched array fields. Force-writing ensures the
+    // resolver always receives a valid array (not undefined).
+    if (fields?.includes('professional_interests')) {
+      setValue('professional_interests', getValues('professional_interests') ?? [])
+    }
+    if (fields?.includes('personal_interests')) {
+      setValue('personal_interests', getValues('personal_interests') ?? [])
+    }
+
     if (fields && fields.length > 0) {
       const valid = await trigger(fields)
       if (!valid) return
