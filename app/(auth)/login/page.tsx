@@ -30,14 +30,15 @@ export default function LoginPage() {
     try {
       const supabase = createClient()
 
-      // Check allowlist
-      const { data: allowed, error: allowErr } = await supabase
-        .from('allowed_emails')
-        .select('id')
-        .eq('email', email.toLowerCase().trim())
-        .single()
+      // Check allowlist via API route (uses service role key to bypass RLS)
+      const checkRes = await fetch('/api/auth/check-allowlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.toLowerCase().trim() }),
+      })
+      const { allowed } = await checkRes.json()
 
-      if (allowErr || !allowed) {
+      if (!allowed) {
         setError('This email is not authorized. Please contact NS to request access.')
         setLoading(false)
         return
