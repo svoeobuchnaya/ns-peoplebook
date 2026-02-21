@@ -13,8 +13,15 @@ export const profileSchema = z.object({
   age: z.number().int().min(18, 'Must be at least 18').max(120).optional().nullable(),
   gender: z.enum(['male', 'female', 'prefer_not_to_say']).optional().nullable(),
   languages: z.array(z.string()).min(0).optional(),
-  professional_interests: z.array(z.string()).min(1, 'Select at least one professional interest'),
-  personal_interests: z.array(z.string()).min(1, 'Select at least one personal interest'),
+  // Preprocess so RHF never sends undefined (Controller may not write until first onChange)
+  professional_interests: z.preprocess(
+    (val) => (Array.isArray(val) ? val : []),
+    z.array(z.string()).min(1, 'Select at least one professional interest')
+  ),
+  personal_interests: z.preprocess(
+    (val) => (Array.isArray(val) ? val : []),
+    z.array(z.string()).min(1, 'Select at least one personal interest')
+  ),
   looking_for_professional: z.boolean().optional(),
   looking_for_friendship: z.boolean().optional(),
   looking_for_romantic: z.boolean().optional(),

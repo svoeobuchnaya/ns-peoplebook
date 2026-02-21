@@ -31,6 +31,7 @@ export default function ProfileEditPage() {
   const [activeSection, setActiveSection] = useState<FormSection>('identity')
   const [additionalInfo, setAdditionalInfo] = useState<{ label: string; value: string }[]>([])
   const [savedMessage, setSavedMessage] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const { register, handleSubmit, control, reset, watch, formState: { errors } } = useForm<ProfileUpdateData>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -98,12 +99,19 @@ export default function ProfileEditPage() {
   const onSubmit = async (data: ProfileUpdateData) => {
     if (!profileId) return
     setSaving(true)
+    setSaveError(null)
     try {
       const res = await fetch(`/api/profiles/${profileId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profile: { ...data, additional_info: additionalInfo },
+          profile: {
+            ...data,
+            additional_info: additionalInfo,
+            // Normalize empty strings → null so Zod min() doesn't reject them
+            profile_slug: data.profile_slug?.trim() || null,
+            cohort: data.cohort?.trim() || null,
+          },
           visibility,
         }),
       })
@@ -111,7 +119,12 @@ export default function ProfileEditPage() {
       if (res.ok) {
         setSavedMessage(true)
         setTimeout(() => setSavedMessage(false), 3000)
+      } else {
+        const json = await res.json().catch(() => ({}))
+        setSaveError(json.error || 'Failed to save changes. Please try again.')
       }
+    } catch {
+      setSaveError('Something went wrong. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -528,6 +541,9 @@ export default function ProfileEditPage() {
         )}
 
         {/* Save button */}
+        {saveError && (
+          <p className="text-sm text-[#E8001D] text-right">{saveError}</p>
+        )}
         <div className="flex justify-end gap-3">
           <Link href="/profile/me">
             <Button type="button" variant="outline" className="border-[#E0E0E0]">

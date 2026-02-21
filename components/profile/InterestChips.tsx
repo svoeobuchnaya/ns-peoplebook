@@ -15,23 +15,26 @@ export function InterestChips({ value, onChange, options, label }: InterestChips
   const [showCustomInput, setShowCustomInput] = useState(false)
   const [customInput, setCustomInput] = useState('')
 
+  // Ensure we always work with an array (form state may be undefined until first sync)
+  const safeValue = Array.isArray(value) ? value : []
+
   const toggleOption = (option: string) => {
-    if (value.includes(option)) {
-      onChange(value.filter((v) => v !== option))
+    if (safeValue.includes(option)) {
+      onChange(safeValue.filter((v) => v !== option))
     } else {
-      onChange([...value, option])
+      onChange([...safeValue, option])
     }
   }
 
   const addCustom = () => {
     const trimmed = customInput.trim()
     if (!trimmed) return
-    if (value.includes(trimmed)) {
+    if (safeValue.includes(trimmed)) {
       setCustomInput('')
       setShowCustomInput(false)
       return
     }
-    onChange([...value, trimmed])
+    onChange([...safeValue, trimmed])
     setCustomInput('')
     setShowCustomInput(false)
   }
@@ -47,13 +50,13 @@ export function InterestChips({ value, onChange, options, label }: InterestChips
   }
 
   // Custom entries are those in value that are NOT in the predefined options list
-  const customEntries = value.filter((v) => !options.includes(v))
+  const customEntries = safeValue.filter((v) => !options.includes(v))
 
   return (
     <div>
       <div className="flex flex-wrap gap-2">
         {options.map((option) => {
-          const selected = value.includes(option)
+          const selected = safeValue.includes(option)
           return (
             <button
               key={option}
@@ -80,7 +83,7 @@ export function InterestChips({ value, onChange, options, label }: InterestChips
             {entry}
             <button
               type="button"
-              onClick={() => onChange(value.filter((v) => v !== entry))}
+              onClick={() => onChange(safeValue.filter((v) => v !== entry))}
               className="text-white/70 hover:text-white transition-colors ml-0.5"
               aria-label={`Remove ${entry}`}
             >
